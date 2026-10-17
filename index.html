@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TaskFlow — Modern To-Do & Task Manager</title>
-  <meta name="description" content="TaskFlow is a high-performance, minimalist to-do list web application powered by Supabase and Vanilla JavaScript.">
+  <meta name="description" content="TaskFlow is a high-performance, minimalist to-do list web application powered by Vanilla JavaScript and Local Storage.">
   
   <!-- Favicon using SVG -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300f2fe' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 11l3 3L22 4'/><path d='M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'/></svg>" type="image/svg+xml">
@@ -13,9 +13,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
-
-  <!-- Supabase CDN Client -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Application Stylesheet -->
   <link rel="stylesheet" href="style.css">
@@ -39,15 +36,15 @@
         </div>
         <div class="brand-text">
           <h1 class="app-title">TaskFlow</h1>
-          <p class="app-subtitle">Realtime cloud task management</p>
+          <p class="app-subtitle">Personal task &amp; productivity manager</p>
         </div>
       </div>
 
       <div class="header-actions">
-        <!-- Database Connection Status Indicator -->
-        <div id="db-status-badge" class="status-badge status-checking" title="Supabase Database Status" aria-label="Database Status">
+        <!-- Storage Status Indicator -->
+        <div id="db-status-badge" class="status-badge status-connected" title="Browser Local Storage Active" aria-label="Storage Status">
           <span class="status-dot"></span>
-          <span id="db-status-text">Checking Database...</span>
+          <span id="db-status-text">Local Storage</span>
         </div>
       </div>
     </header>
@@ -151,7 +148,7 @@
           </div>
 
           <div class="toolbar-actions">
-            <button id="refresh-btn" class="icon-btn-secondary" title="Refresh task list from Supabase" aria-label="Refresh tasks">
+            <button id="refresh-btn" class="icon-btn-secondary" title="Refresh task list" aria-label="Refresh tasks">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.19"></path>
               </svg>
@@ -162,7 +159,7 @@
         <!-- Task List Loading State -->
         <div id="loading-indicator" class="loading-state hidden" aria-live="polite">
           <div class="spinner"></div>
-          <p>Syncing tasks with Supabase...</p>
+          <p>Loading tasks...</p>
         </div>
 
         <!-- Task List Empty State -->
@@ -189,7 +186,7 @@
 
     <!-- App Footer -->
     <footer class="app-footer">
-      <p>TaskFlow &bull; Built with HTML5, CSS3, JavaScript &amp; Supabase PostgreSQL</p>
+      <p>TaskFlow &bull; Built with HTML5, CSS3 &amp; Vanilla JavaScript</p>
     </footer>
   </div>
 
@@ -213,7 +210,7 @@
       </div>
       <div class="modal-body">
         <div id="modal-task-preview" class="task-preview-box"></div>
-        <p class="modal-warning-text">This will delete the task permanently from your Supabase PostgreSQL database.</p>
+        <p class="modal-warning-text">This will delete the task permanently from your list.</p>
       </div>
       <div class="modal-actions">
         <button id="cancel-delete-btn" class="btn btn-secondary">Cancel</button>
