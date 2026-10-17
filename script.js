@@ -1,29 +1,41 @@
 /**
  * TaskFlow — Modern To-Do Web Application
- * Core JavaScript logic and Supabase integration
+ * Core JavaScript logic powered by Local Storage (No backend required)
  * 
- * Strict Vanilla JS, safe DOM manipulation, robust error handling.
+ * Strict Vanilla JS, safe DOM manipulation, robust local persistence.
  */
 
 // =============================================================================
-// 1. Supabase Database Configuration
+// 1. Storage Configuration & Initial State
 // =============================================================================
 
-/**
- * Configure your Supabase Project URL and Public Anon Key below:
- * 
- * ⚠️ SECURITY NOTE:
- * - Only use your PUBLIC 'anon' key here (it is safe to use in client-side code).
- * - NEVER use or expose your 'service_role' secret key in frontend code!
- */
-const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+const STORAGE_KEY = 'taskflow_tasks';
+
+// Default tasks to display immediately for any visitor on their first visit
+const DEFAULT_TASKS = [
+  {
+    id: 'task-1',
+    title: 'Welcome to TaskFlow! 👋',
+    completed: true,
+    created_at: new Date(Date.now() - 3600000).toISOString()
+  },
+  {
+    id: 'task-2',
+    title: 'Click the checkbox on the left to complete a task ✅',
+    completed: false,
+    created_at: new Date(Date.now() - 1800000).toISOString()
+  },
+  {
+    id: 'task-3',
+    title: 'Type in the box above and press Enter to add your own tasks 🚀',
+    completed: false,
+    created_at: new Date().toISOString()
+  }
+];
 
 // In-memory application state
-let supabaseClient = null;
 let tasks = [];
-let currentFilter = 'all'; // 'all' | 'pending' | 'completed'x  x
-let isSubmitting = false;
+let currentFilter = 'all'; // 'all' | 'pending' | 'completed'
 let pendingDeleteTaskId = null;
 
 // =============================================================================
@@ -70,51 +82,51 @@ const elements = {
 };
 
 // =============================================================================
-// 3. Supabase Client Initialization
+// 3. Local Storage Operations
 // =============================================================================
 
 /**
- * Validates credentials format and creates the Supabase client instance.
+ * Loads tasks from localStorage or initializes with default demo tasks.
  */
-function initSupabase() {
-  if (!window.supabase) {
-    updateDatabaseStatus('error', 'CDN Library Error');
-    showToast('Failed to load Supabase library from CDN. Check your internet connection.', 'error');
-    return false;
-  }
-
-  // Check if credentials have been replaced with real project values
-  const isConfigured = 
-    SUPABASE_URL && 
-    SUPABASE_ANON_KEY && 
-    SUPABASE_URL !== 'https://YOUR_PROJECT_ID.supabase.co' && 
-    SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY' &&
-    SUPABASE_URL.startsWith('https://');
-
-  if (!isConfigured) {
-    updateDatabaseStatus('error', 'Credentials Required');
-    showToast('Set your SUPABASE_URL and SUPABASE_ANON_KEY at the top of script.js', 'info');
-    return false;
-  }
-
+function loadTasks() {
   try {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    updateDatabaseStatus('connected', 'Cloud Connected');
-    return true;
+    const rawData = localStorage.getItem(STORAGE_KEY);
+    if (rawData) {
+      const parsed = JSON.parse(rawData);
+      if (Array.isArray(parsed)) {
+        tasks = parsed;
+        updateStorageStatus('connected', 'Local Storage Active');
+        return;
+      }
+    }
   } catch (err) {
-    console.error('Failed to initialize Supabase client:', err);
-    updateDatabaseStatus('error', 'Init Failed');
-    showToast(`Initialization error: ${err.message}`, 'error');
-    return false;
+    console.warn('Could not read from localStorage, resetting with defaults:', err);
+  }
+
+  // First time visitor or reset: load defaults
+  tasks = [...DEFAULT_TASKS];
+  saveTasks();
+  updateStorageStatus('connected', 'Local Storage Active');
+}
+
+/**
+ * Persists current in-memory tasks to browser localStorage.
+ */
+function saveTasks() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  } catch (err) {
+    console.error('Error saving to localStorage:', err);
+    showToast('Failed to save task to browser storage.', 'error');
   }
 }
 
 /**
  * Updates the visual status badge in the header.
- * @param {'checking' | 'connected' | 'error'} state
+ * @param {'connected' | 'error' | 'checking'} state
  * @param {string} label
  */
-function updateDatabaseStatus(state, label) {
+function updateStorageStatus(state, label) {
   if (!elements.dbStatusBadge || !elements.dbStatusText) return;
 
   elements.dbStatusBadge.classList.remove('status-checking', 'status-connected', 'status-error');
@@ -131,47 +143,14 @@ function updateDatabaseStatus(state, label) {
 }
 
 // =============================================================================
-// 4. Data Operations (CRUD with Supabase)
+// 4. Data Operations (CRUD)
 // =============================================================================
 
 /**
- * Fetch all tasks from Supabase ordered chronologically (newest first).
- */
-async function fetchTasks() {
-  if (!supabaseClient) {
-    renderTasks();
-    return;
-  }
-
-  showLoading(true);
-
-  try {
-    const { data, error } = await supabaseClient
-      .from('tasks')
-      .select('id, title, completed, created_at')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      throw error;
-    }
-
-    tasks = data || [];
-    updateDatabaseStatus('connected', 'Cloud Connected');
-    renderTasks();
-  } catch (err) {
-    console.error('Error fetching tasks from Supabase:', err);
-    updateDatabaseStatus('error', 'Sync Error');
-    showToast(`Failed to load tasks: ${err.message || 'Check database permissions/RLS'}`, 'error');
-  } finally {
-    showLoading(false);
-  }
-}
-
-/**
- * Add a new task to Supabase and update the UI.
+ * Add a new task to the list and save it.
  * @param {string} rawTitle
  */
-async function addTask(rawTitle) {
+function addTask(rawTitle) {
   const title = (rawTitle || '').trim();
 
   // Validate non-empty and non-whitespace
@@ -181,120 +160,46 @@ async function addTask(rawTitle) {
     return;
   }
 
-  if (!supabaseClient) {
-    showToast('Supabase is not connected. Please add your credentials in script.js', 'error');
-    return;
-  }
+  const newTask = {
+    id: 'task-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+    title: title,
+    completed: false,
+    created_at: new Date().toISOString()
+  };
 
-  // Prevent duplicate submissions while operation is pending
-  if (isSubmitting) return;
-  setSubmittingState(true);
+  // Add the new task to the top of the list
+  tasks.unshift(newTask);
+  saveTasks();
+  renderTasks();
 
-  try {
-    const { data, error } = await supabaseClient
-      .from('tasks')
-      .insert([{ title, completed: false }])
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    if (data) {
-      // Add the new task to the top of the list
-      tasks.unshift(data);
-      renderTasks();
-      elements.taskInput.value = '';
-      showToast('Task added successfully!', 'success');
-    }
-  } catch (err) {
-    console.error('Error inserting task:', err);
-    showToast(`Failed to add task: ${err.message}`, 'error');
-  } finally {
-    setSubmittingState(false);
-    elements.taskInput.focus();
-  }
+  elements.taskInput.value = '';
+  elements.taskInput.focus();
+  showToast('Task added successfully!', 'success');
 }
 
 /**
- * Toggle task completion status with optimistic UI updates.
+ * Toggle task completion status.
  * @param {string} taskId
- * @param {boolean} currentStatus
  */
-async function toggleTaskStatus(taskId, currentStatus) {
-  if (!supabaseClient) {
-    showToast('Supabase is not connected.', 'error');
-    return;
-  }
-
-  const nextStatus = !currentStatus;
-
-  // Optimistic UI update
+function toggleTaskStatus(taskId) {
   const taskIndex = tasks.findIndex(t => t.id === taskId);
   if (taskIndex === -1) return;
 
-  const previousStatus = tasks[taskIndex].completed;
-  tasks[taskIndex].completed = nextStatus;
+  tasks[taskIndex].completed = !tasks[taskIndex].completed;
+  saveTasks();
   renderTasks();
-
-  try {
-    const { error } = await supabaseClient
-      .from('tasks')
-      .update({ completed: nextStatus })
-      .eq('id', taskId);
-
-    if (error) {
-      throw error;
-    }
-  } catch (err) {
-    console.error('Error updating task:', err);
-    // Rollback to previous state on failure
-    tasks[taskIndex].completed = previousStatus;
-    renderTasks();
-    showToast(`Failed to update status: ${err.message}`, 'error');
-  }
 }
 
 /**
- * Delete a task permanently from the Supabase database.
+ * Delete a task permanently from the list.
  * @param {string} taskId
  */
-async function deleteTask(taskId) {
-  if (!supabaseClient) {
-    showToast('Supabase is not connected.', 'error');
-    return;
-  }
-
-  // Set modal confirm button loading state
-  const confirmBtn = elements.confirmDeleteBtn;
-  const spinner = confirmBtn.querySelector('.btn-spinner');
-  confirmBtn.disabled = true;
-  if (spinner) spinner.classList.remove('hidden');
-
-  try {
-    const { error } = await supabaseClient
-      .from('tasks')
-      .delete()
-      .eq('id', taskId);
-
-    if (error) {
-      throw error;
-    }
-
-    // Remove task from local state
-    tasks = tasks.filter(t => t.id !== taskId);
-    closeDeleteModal();
-    renderTasks();
-    showToast('Task deleted successfully.', 'info');
-  } catch (err) {
-    console.error('Error deleting task:', err);
-    showToast(`Failed to delete task: ${err.message}`, 'error');
-  } finally {
-    confirmBtn.disabled = false;
-    if (spinner) spinner.classList.add('hidden');
-    pendingDeleteTaskId = null;
-  }
+function deleteTask(taskId) {
+  tasks = tasks.filter(t => t.id !== taskId);
+  saveTasks();
+  closeDeleteModal();
+  renderTasks();
+  showToast('Task deleted successfully.', 'info');
 }
 
 // =============================================================================
@@ -367,7 +272,7 @@ function createTaskElement(task) {
   `;
 
   checkboxBtn.addEventListener('click', () => {
-    toggleTaskStatus(task.id, task.completed);
+    toggleTaskStatus(task.id);
   });
 
   // Text content wrapper
@@ -456,34 +361,6 @@ function updateCounters() {
   elements.badgeCompleted.textContent = completed;
 }
 
-/**
- * Shows or hides the loading spinner.
- */
-function showLoading(show) {
-  if (show) {
-    elements.loadingIndicator.classList.remove('hidden');
-  } else {
-    elements.loadingIndicator.classList.add('hidden');
-  }
-}
-
-/**
- * Toggles form submission busy state to prevent duplicates.
- */
-function setSubmittingState(submitting) {
-  isSubmitting = submitting;
-  elements.addTaskBtn.disabled = submitting;
-  elements.taskInput.disabled = submitting;
-
-  if (elements.btnSpinner) {
-    if (submitting) {
-      elements.btnSpinner.classList.remove('hidden');
-    } else {
-      elements.btnSpinner.classList.add('hidden');
-    }
-  }
-}
-
 // =============================================================================
 // 6. Delete Confirmation Modal
 // =============================================================================
@@ -569,8 +446,9 @@ function attachEventListeners() {
 
   // Refresh tasks button
   elements.refreshBtn.addEventListener('click', () => {
-    fetchTasks();
-    showToast('Refreshing tasks from Supabase...', 'info');
+    loadTasks();
+    renderTasks();
+    showToast('Task list refreshed!', 'info');
   });
 
   // Delete modal buttons
@@ -604,11 +482,6 @@ function attachEventListeners() {
 
 document.addEventListener('DOMContentLoaded', () => {
   attachEventListeners();
-
-  const isReady = initSupabase();
-  if (isReady) {
-    fetchTasks();
-  } else {
-    renderTasks();
-  }
+  loadTasks();
+  renderTasks();
 });
