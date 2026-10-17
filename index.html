@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskFlow — Modern To-Do & Task Manager</title>
+  <meta name="description" content="TaskFlow is a high-performance, minimalist to-do list web application powered by Supabase and Vanilla JavaScript.">
+  
+  <!-- Favicon using SVG -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300f2fe' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 11l3 3L22 4'/><path d='M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'/></svg>" type="image/svg+xml">
+
+  <!-- Google Fonts: Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Supabase CDN Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Application Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-background">
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+    <div class="grid-overlay"></div>
+  </div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 11 12 14 22 4"></polyline>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1 class="app-title">TaskFlow</h1>
+          <p class="app-subtitle">Realtime cloud task management</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Database Connection Status Indicator -->
+        <div id="db-status-badge" class="status-badge status-checking" title="Supabase Database Status" aria-label="Database Status">
+          <span class="status-dot"></span>
+          <span id="db-status-text">Checking Database...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+      <!-- Quick Metrics Bar -->
+      <section class="stats-grid" aria-label="Task Statistics">
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-label">Total Tasks</span>
+            <div class="stat-icon icon-blue">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="9" y1="9" x2="15" y2="9"></line>
+                <line x1="9" y1="13" x2="15" y2="13"></line>
+                <line x1="9" y1="17" x2="13" y2="17"></line>
+              </svg>
+            </div>
+          </div>
+          <span id="count-total" class="stat-value">0</span>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-label">Pending</span>
+            <div class="stat-icon icon-cyan">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </div>
+          </div>
+          <span id="count-pending" class="stat-value">0</span>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-label">Completed</span>
+            <div class="stat-icon icon-purple">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+          </div>
+          <span id="count-completed" class="stat-value">0</span>
+        </div>
+      </section>
+
+      <!-- Task Input Form -->
+      <section class="task-input-section">
+        <form id="add-task-form" class="task-form" autocomplete="off">
+          <div class="input-wrapper">
+            <div class="input-prefix-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="16"></line>
+                <line x1="8" y1="12" x2="16" y2="12"></line>
+              </svg>
+            </div>
+            <input 
+              type="text" 
+              id="task-input" 
+              class="task-input" 
+              placeholder="What needs to be done? (Press Enter to add)" 
+              maxlength="240"
+              required
+              aria-label="New task title"
+            >
+            <span class="kbd-hint"><kbd>Enter ↵</kbd></span>
+          </div>
+          <button type="submit" id="add-task-btn" class="btn btn-primary" aria-label="Add Task">
+            <span class="btn-spinner hidden" aria-hidden="true"></span>
+            <span class="btn-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </span>
+            <span class="btn-text">Add Task</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- Tasks Section -->
+      <section class="tasks-card">
+        <!-- Filter Bar -->
+        <div class="tasks-toolbar">
+          <div class="filter-tabs" role="tablist" aria-label="Task filters">
+            <button class="filter-tab active" data-filter="all" role="tab" aria-selected="true" id="tab-all">
+              All <span class="tab-badge" id="badge-all">0</span>
+            </button>
+            <button class="filter-tab" data-filter="pending" role="tab" aria-selected="false" id="tab-pending">
+              Pending <span class="tab-badge" id="badge-pending">0</span>
+            </button>
+            <button class="filter-tab" data-filter="completed" role="tab" aria-selected="false" id="tab-completed">
+              Completed <span class="tab-badge" id="badge-completed">0</span>
+            </button>
+          </div>
+
+          <div class="toolbar-actions">
+            <button id="refresh-btn" class="icon-btn-secondary" title="Refresh task list from Supabase" aria-label="Refresh tasks">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.19"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Task List Loading State -->
+        <div id="loading-indicator" class="loading-state hidden" aria-live="polite">
+          <div class="spinner"></div>
+          <p>Syncing tasks with Supabase...</p>
+        </div>
+
+        <!-- Task List Empty State -->
+        <div id="empty-state" class="empty-state hidden">
+          <div class="empty-icon-wrapper">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+          </div>
+          <h2 class="empty-title">All caught up!</h2>
+          <p id="empty-description" class="empty-text">No tasks found. Add your first task above to start tracking your workflow.</p>
+        </div>
+
+        <!-- Task List Element -->
+        <ul id="task-list" class="task-list" aria-label="Task items">
+          <!-- Populated safely via JavaScript DOM API -->
+        </ul>
+      </section>
+    </main>
+
+    <!-- App Footer -->
+    <footer class="app-footer">
+      <p>TaskFlow &bull; Built with HTML5, CSS3, JavaScript &amp; Supabase PostgreSQL</p>
+    </footer>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="delete-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon warning">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18"></path>
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+        </div>
+        <div>
+          <h3 id="modal-title" class="modal-title">Delete Task</h3>
+          <p class="modal-subtitle">Are you sure you want to remove this task?</p>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div id="modal-task-preview" class="task-preview-box"></div>
+        <p class="modal-warning-text">This will delete the task permanently from your Supabase PostgreSQL database.</p>
+      </div>
+      <div class="modal-actions">
+        <button id="cancel-delete-btn" class="btn btn-secondary">Cancel</button>
+        <button id="confirm-delete-btn" class="btn btn-danger">
+          <span class="btn-spinner hidden" aria-hidden="true"></span>
+          <span>Delete Task</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="assertive" aria-atomic="true"></div>
+
+  <!-- Application Logic -->
+  <script src="script.js"></script>
+</body>
+</html>
